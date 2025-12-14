@@ -72,24 +72,26 @@
             border-radius: 12px;
             padding: 15px;
             box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-            position: relative;
-            height: 350px; /* グラフの高さ固定 */
+            /* フレックスボックスでCanvasを親いっぱいに広げる */
             display: flex;
             flex-direction: column;
+            height: 350px;
         }
 
         .chart-title {
             text-align: center;
             font-weight: bold;
-            margin-bottom: 10px;
+            margin-bottom: 15px;
             color: #555;
+            font-size: 1.1rem;
         }
 
         .canvas-container {
             flex-grow: 1;
             position: relative;
             width: 100%;
-            height: 100%;
+            /* min-heightを指定してつぶれないようにする */
+            min-height: 0; 
         }
 
         .loading {
@@ -148,15 +150,19 @@
                 timeDisplay.textContent = `取得日時: ${now.toLocaleString('ja-JP')}`;
             }
 
+            console.log("Fetching URL:", apiURL);
+
             fetch(apiURL)
                 .then(response => {
                     if (!response.ok) throw new Error(`HTTPエラー status: ${response.status}`);
                     return response.json();
                 })
                 .then(data => {
+                    console.log("Data received:", data);
                     renderGraphs(data);
                 })
                 .catch(error => {
+                    console.error("Render Error:", error);
                     mainContent.innerHTML = `
                         <div class="loading" style="color: #d32f2f;">
                             データの取得に失敗しました。<br><small>${error.message}</small>
@@ -182,6 +188,9 @@
                 `;
 
                 const hourly = data.hourly;
+                if (!hourly || !hourly.precipitation_probability) {
+                    throw new Error("降水確率データが見つかりません");
+                }
                 
                 // 現在時刻 (JST) 以降のデータを検索
                 const nowJST = new Date(Date.now() + 9 * 60 * 60 * 1000);
@@ -205,8 +214,6 @@
                     const hour = dateObj.getHours();
                     const day = dateObj.getDate();
                     
-                    // X軸ラベル: "14日 12:00" または単に "12:00"
-                    // 0時のときだけ日付を入れる、あるいは最初だけ日付を入れるなどの工夫
                     let label = `${hour}:00`;
                     if (hour === 0 || i === startIndex) {
                         label = `${day}日 ${hour}:00`;
@@ -214,8 +221,12 @@
                     labels.push(label);
 
                     temps.push(hourly.temperature_2m[i]);
-                    probs.push(hourly.precipitation_probability[i]);
+                    // nullの場合は0として扱う
+                    probs.push(hourly.precipitation_probability[i] || 0);
                 }
+
+                // デバッグ用ログ
+                console.log("Processed Data:", { labels, temps, probs });
 
                 // 気温グラフ描画
                 new Chart(document.getElementById('tempChart'), {
@@ -228,7 +239,7 @@
                             borderColor: '#ffb703',
                             backgroundColor: 'rgba(255, 183, 3, 0.2)',
                             borderWidth: 2,
-                            tension: 0.3, // 曲線にする
+                            tension: 0.3, 
                             fill: true,
                             pointRadius: 3
                         }]
@@ -244,7 +255,8 @@
                 });
 
                 // 降水確率グラフ描画
-                new Chart(document.getElementById('rainChart'), {
+                const rainCtx = document.getElementById('rainChart');
+                new Chart(rainCtx, {
                     type: 'bar',
                     data: {
                         labels: labels,
@@ -252,7 +264,11 @@
                             label: '降水確率',
                             data: probs,
                             backgroundColor: '#0077b6',
+                            borderColor: '#005f87',
+                            borderWidth: 1,
                             borderRadius: 4,
+                            // 棒の幅を調整
+                            barPercentage: 0.8,
                         }]
                     },
                     options: {
@@ -260,9 +276,10 @@
                         maintainAspectRatio: false,
                         scales: {
                             y: { 
-                                beginAtZero: true, 
-                                max: 100,
-                                title: { display: true, text: '%' }
+                                min: 0,
+                                max: 100, // 常に0-100%で表示
+                                title: { display: true, text: '%' },
+                                ticks: { stepSize: 20 }
                             }
                         },
                         plugins: { legend: { display: false } }
