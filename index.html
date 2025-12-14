@@ -3,8 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>岩国市の天気予報 (48時間)</title>
-    <!-- Google Fonts -->
+    <title>岩国市 天気予報グラフ (24時間)</title>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
@@ -14,9 +16,6 @@
             --bg-color: #f0f4f8;
             --card-bg: #ffffff;
             --text-color: #333333;
-            --accent-rain: #023e8a;
-            --accent-sun: #ffb703;
-            --accent-cloud: #6c757d;
         }
 
         body {
@@ -28,7 +27,7 @@
         }
 
         .container {
-            max-width: 800px;
+            max-width: 1000px;
             margin: 0 auto;
             padding: 20px;
         }
@@ -55,58 +54,42 @@
             margin-top: 10px;
         }
 
-        .forecast-grid {
+        /* グラフを2列（PC）または1列（スマホ）に並べるレイアウト */
+        .charts-container {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-            gap: 15px;
+            grid-template-columns: 1fr;
+            gap: 20px;
         }
 
-        .forecast-card {
+        @media (min-width: 768px) {
+            .charts-container {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+
+        .chart-wrapper {
             background-color: var(--card-bg);
             border-radius: 12px;
             padding: 15px;
             box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-            text-align: center;
-            transition: transform 0.2s;
+            position: relative;
+            height: 350px; /* グラフの高さ固定 */
             display: flex;
             flex-direction: column;
-            justify-content: space-between;
-            height: 160px;
         }
 
-        .forecast-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 10px rgba(0,0,0,0.1);
-        }
-
-        .time {
+        .chart-title {
+            text-align: center;
             font-weight: bold;
-            font-size: 1.1rem;
-            margin-bottom: 5px;
-            border-bottom: 1px solid #eee;
-            padding-bottom: 5px;
-            display: block;
-        }
-
-        .weather-icon {
-            font-size: 2rem;
-            margin: 10px 0;
-        }
-
-        .temp {
-            font-size: 1.2rem;
-            font-weight: bold;
-            color: var(--text-color);
-        }
-
-        .rain-prob {
-            font-size: 0.85rem;
+            margin-bottom: 10px;
             color: #555;
-            margin-top: 5px;
-            background: #eef2f6;
-            border-radius: 10px;
-            padding: 2px 8px;
-            display: inline-block;
+        }
+
+        .canvas-container {
+            flex-grow: 1;
+            position: relative;
+            width: 100%;
+            height: 100%;
         }
 
         .loading {
@@ -116,11 +99,6 @@
             font-size: 1.2rem;
             color: #666;
         }
-
-        /* 天気に応じた簡単な色分け（JSでクラス付与時） */
-        .weather-sunny .weather-icon { color: var(--accent-sun); }
-        .weather-cloudy .weather-icon { color: var(--accent-cloud); }
-        .weather-rainy .weather-icon { color: var(--accent-rain); }
     </style>
 
     <!-- PWA Settings -->
@@ -136,25 +114,22 @@
     <div class="container">
         <header>
             <h1>岩国市の天気予報</h1>
-            <p class="subtitle">今後48時間の予報 (Powered by Open-Meteo)</p>
+            <p class="subtitle">今後24時間のグラフ表示 (Powered by Open-Meteo)</p>
             <div id="current-time" class="timestamp"></div>
         </header>
         
-        <main id="forecast-container" class="forecast-grid">
-            <!-- JavaScriptでここに予報カードが挿入されます -->
+        <main id="main-content">
             <div class="loading">データを読み込み中...</div>
         </main>
     </div>
+
     <script>
-        // グローバルエラーハンドリング：スクリプトエラーを画面に表示
         window.onerror = function(message, source, lineno, colno, error) {
-            const container = document.getElementById('forecast-container');
+            const container = document.getElementById('main-content');
             if (container) {
                 container.innerHTML = `
-                    <div class="loading" style="color: #d32f2f; text-align: left; background: #ffebee; padding: 20px; border-radius: 8px;">
-                        <strong>予期せぬエラーが発生しました:</strong><br>
-                        ${message}<br>
-                        <small>File: ${source}, Line: ${lineno}</small>
+                    <div style="color: #d32f2f; background: #ffebee; padding: 20px; border-radius: 8px;">
+                        <strong>エラーが発生しました:</strong><br>${message}
                     </div>`;
             }
         };
@@ -162,11 +137,9 @@
         document.addEventListener('DOMContentLoaded', () => {
             const LAT = 34.16;
             const LON = 132.22;
-            
-            // API URL (timezone=Asia/Tokyoを指定)
-            const apiURL = `https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}&hourly=temperature_2m,precipitation_probability,weathercode&timezone=Asia%2FTokyo`;
+            const apiURL = `https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}&hourly=temperature_2m,precipitation_probability&timezone=Asia%2FTokyo`;
 
-            const container = document.getElementById('forecast-container');
+            const mainContent = document.getElementById('main-content');
             const timeDisplay = document.getElementById('current-time');
 
             // 現在時刻表示
@@ -175,102 +148,126 @@
                 timeDisplay.textContent = `取得日時: ${now.toLocaleString('ja-JP')}`;
             }
 
-            console.log("Fetching data from:", apiURL);
-
             fetch(apiURL)
                 .then(response => {
-                    if (!response.ok) {
-                        throw new Error(`HTTPエラー status: ${response.status}`);
-                    }
+                    if (!response.ok) throw new Error(`HTTPエラー status: ${response.status}`);
                     return response.json();
                 })
                 .then(data => {
-                    console.log("Data received:", data);
-                    renderForecast(data);
+                    renderGraphs(data);
                 })
                 .catch(error => {
-                    console.error("Fetch error:", error);
-                    if (container) {
-                        container.innerHTML = `
-                            <div class="loading" style="color: #d32f2f;">
-                                データの取得に失敗しました。<br>
-                                インターネット接続を確認してください。<br>
-                                <small>${error.message}</small>
-                            </div>`;
+                    mainContent.innerHTML = `
+                        <div class="loading" style="color: #d32f2f;">
+                            データの取得に失敗しました。<br><small>${error.message}</small>
+                        </div>`;
+                });
+
+            function renderGraphs(data) {
+                mainContent.innerHTML = `
+                    <div class="charts-container">
+                        <div class="chart-wrapper">
+                            <div class="chart-title">🌡️ 気温 (℃)</div>
+                            <div class="canvas-container">
+                                <canvas id="tempChart"></canvas>
+                            </div>
+                        </div>
+                        <div class="chart-wrapper">
+                            <div class="chart-title">☔ 降水確率 (%)</div>
+                            <div class="canvas-container">
+                                <canvas id="rainChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                const hourly = data.hourly;
+                
+                // 現在時刻 (JST) 以降のデータを検索
+                const nowJST = new Date(Date.now() + 9 * 60 * 60 * 1000);
+                const currentIsoJST = nowJST.toISOString().slice(0, 16);
+                
+                let startIndex = hourly.time.findIndex(t => t >= currentIsoJST);
+                if (startIndex === -1) startIndex = 0;
+
+                // 24時間分に制限
+                const count = 24;
+                const endIndex = Math.min(startIndex + count, hourly.time.length);
+
+                // ラベルとデータの配列を作成
+                const labels = [];
+                const temps = [];
+                const probs = [];
+
+                for (let i = startIndex; i < endIndex; i++) {
+                    const timeStr = hourly.time[i];
+                    const dateObj = new Date(timeStr);
+                    const hour = dateObj.getHours();
+                    const day = dateObj.getDate();
+                    
+                    // X軸ラベル: "14日 12:00" または単に "12:00"
+                    // 0時のときだけ日付を入れる、あるいは最初だけ日付を入れるなどの工夫
+                    let label = `${hour}:00`;
+                    if (hour === 0 || i === startIndex) {
+                        label = `${day}日 ${hour}:00`;
+                    }
+                    labels.push(label);
+
+                    temps.push(hourly.temperature_2m[i]);
+                    probs.push(hourly.precipitation_probability[i]);
+                }
+
+                // 気温グラフ描画
+                new Chart(document.getElementById('tempChart'), {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: '気温',
+                            data: temps,
+                            borderColor: '#ffb703',
+                            backgroundColor: 'rgba(255, 183, 3, 0.2)',
+                            borderWidth: 2,
+                            tension: 0.3, // 曲線にする
+                            fill: true,
+                            pointRadius: 3
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: { beginAtZero: false, title: { display: true, text: '℃' } }
+                        },
+                        plugins: { legend: { display: false } }
                     }
                 });
 
-            function renderForecast(data) {
-                if (!container) return;
-                container.innerHTML = ''; // Loading表示クリア
-
-                const hourly = data.hourly;
-                if (!hourly) {
-                    throw new Error("データ形式が不正です (hourly data missing)");
-                }
-
-                // 現在時刻 (JST) の文字列 "YYYY-MM-DDTHH:mm" を作成して比較
-                // APIのtimeは "2023-12-14T12:00" のようなローカル時間(JST)文字列
-                const nowJST = new Date(Date.now() + 9 * 60 * 60 * 1000); // UTC時間に9時間足す
-                const currentIsoJST = nowJST.toISOString().slice(0, 16);  // "YYYY-MM-DDTHH:mm"
-
-                // 現在時刻以降のデータを探す
-                let startIndex = hourly.time.findIndex(t => t >= currentIsoJST);
-                
-                // 見つからない場合（APIデータが古い、または日付跨ぎの不整合）は0から
-                if (startIndex === -1) startIndex = 0;
-
-                // 48時間分、またはデータがある限り表示
-                const count = 48;
-                const endIndex = Math.min(startIndex + count, hourly.time.length);
-
-                // データ作成ループ
-                for (let i = startIndex; i < endIndex; i++) {
-                    const timeStr = hourly.time[i];
-                    const temp = hourly.temperature_2m[i];
-                    const rainProb = hourly.precipitation_probability[i];
-                    const code = hourly.weathercode[i];
-
-                    // 日付表示用の処理
-                    const dateObj = new Date(timeStr);
-                    const month = dateObj.getMonth() + 1;
-                    const day = dateObj.getDate();
-                    const hour = dateObj.getHours();
-
-                    const weatherInfo = getWeatherInfo(code);
-
-                    const card = document.createElement('div');
-                    card.className = `forecast-card weather-${weatherInfo.classType}`;
-                    
-                    // 時間の表示 (0時の場合は日付も入れる)
-                    let timeLabel = `${hour}:00`;
-                    if (hour === 0 || i === startIndex) {
-                        timeLabel = `<span style="font-size:0.8em">${month}/${day}</span> ${hour}:00`;
+                // 降水確率グラフ描画
+                new Chart(document.getElementById('rainChart'), {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: '降水確率',
+                            data: probs,
+                            backgroundColor: '#0077b6',
+                            borderRadius: 4,
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: { 
+                                beginAtZero: true, 
+                                max: 100,
+                                title: { display: true, text: '%' }
+                            }
+                        },
+                        plugins: { legend: { display: false } }
                     }
-
-                    card.innerHTML = `
-                        <span class="time">${timeLabel}</span>
-                        <div class="weather-icon" title="${weatherInfo.text}">${weatherInfo.icon}</div>
-                        <div class="temp">${temp}℃</div>
-                        <div class="rain-prob">☔ ${rainProb === null ? 0 : rainProb}%</div>
-                    `;
-                    
-                    container.appendChild(card);
-                }
-            }
-
-            function getWeatherInfo(code) {
-                if (code === 0) return { text: '快晴', icon: '☀', classType: 'sunny' };
-                if (code === 1 || code === 2 || code === 3) return { text: '晴れ/曇り', icon: '⛅', classType: 'cloudy' };
-                if (code === 45 || code === 48) return { text: '霧', icon: '🌫', classType: 'cloudy' };
-                if (code >= 51 && code <= 55) return { text: '霧雨', icon: '🌦', classType: 'rainy' };
-                if (code >= 61 && code <= 65) return { text: '雨', icon: '☔', classType: 'rainy' };
-                if (code >= 66 && code <= 67) return { text: '氷雨', icon: '🌨', classType: 'rainy' };
-                if (code >= 71 && code <= 77) return { text: '雪', icon: '⛄', classType: 'cloudy' };
-                if (code >= 80 && code <= 82) return { text: 'にわか雨', icon: '☂', classType: 'rainy' };
-                if (code >= 85 && code <= 86) return { text: '雪', icon: '☃', classType: 'cloudy' };
-                if (code >= 95) return { text: '雷雨', icon: '⚡', classType: 'rainy' };
-                return { text: '不明', icon: '❓', classType: 'cloudy' };
+                });
             }
         });
     </script>
