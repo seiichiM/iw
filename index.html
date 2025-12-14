@@ -2,116 +2,105 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Simple Billiards</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>岩国市 天気予報グラフ (24時間)</title>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --table-color: #2e7d32;
-            --wood-color: #5d4037;
-            --pocket-color: #1a1a1a;
-            --bg-color: #222;
-            --text-color: #eee;
+            --primary-color: #0077b6;
+            --bg-color: #f0f4f8;
+            --card-bg: #ffffff;
+            --text-color: #333333;
         }
 
         body {
+            font-family: 'Noto Sans JP', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
             margin: 0;
             padding: 0;
-            width: 100vw;
-            height: 100vh;
-            background-color: var(--bg-color);
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        h1 {
+            color: var(--primary-color);
+            margin-bottom: 5px;
+        }
+
+        .subtitle {
+            font-size: 0.9rem;
+            color: #666;
+            margin-top: 0;
+        }
+
+        .timestamp {
+            font-size: 0.8rem;
+            color: #888;
+            margin-top: 10px;
+        }
+
+        /* グラフを2列（PC）または1列（スマホ）に並べるレイアウト */
+        .charts-container {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 20px;
+        }
+
+        @media (min-width: 768px) {
+            .charts-container {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+
+        .chart-wrapper {
+            background-color: var(--card-bg);
+            border-radius: 12px;
+            padding: 15px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            /* フレックスボックスでCanvasを親いっぱいに広げる */
             display: flex;
             flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            overflow: hidden;
-            touch-action: none; /* スマホでのスクロール防止 */
+            height: 350px;
         }
 
-        #ui-container {
-            position: absolute;
-            top: 20px;
-            width: 100%;
-            display: flex;
-            justify-content: space-between;
-            padding: 0 40px;
-            box-sizing: border-box;
-            pointer-events: none; /* UIの下のCanvas操作を邪魔しないように */
-            z-index: 10;
-        }
-
-        .ui-box {
-            background: rgba(0, 0, 0, 0.5);
-            padding: 10px 20px;
-            border-radius: 20px;
-            color: var(--text-color);
-            font-size: 1.2rem;
-            font-weight: bold;
-            pointer-events: auto;
-            backdrop-filter: blur(5px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
-        #game-container {
-            position: relative;
-            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
-            border-radius: 15px;
-            overflow: hidden;
-        }
-
-        canvas {
-            display: block;
-            background-color: var(--table-color);
-            cursor: crosshair;
-        }
-
-        /* 木枠の装飾 */
-        #game-container::after {
-            content: '';
-            position: absolute;
-            top: 0; left: 0; right: 0; bottom: 0;
-            border: 20px solid var(--wood-color);
-            border-radius: 15px;
-            pointer-events: none;
-            box-shadow: inset 0 0 20px rgba(0,0,0,0.5);
-        }
-
-        #message {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(0, 0, 0, 0.85);
-            color: white;
-            padding: 30px 50px;
-            border-radius: 10px;
+        .chart-title {
             text-align: center;
-            display: none;
-            z-index: 20;
-            border: 2px solid #ffd700;
+            font-weight: bold;
+            margin-bottom: 15px;
+            color: #555;
+            font-size: 1.1rem;
         }
 
-        #message h1 { margin: 0 0 20px 0; font-size: 2rem; }
-        
-        button {
-            background: #4caf50;
-            color: white;
-            border: none;
-            padding: 10px 20px;
+        .canvas-container {
+            flex-grow: 1;
+            position: relative;
+            width: 100%;
+            height: 100%; /* 高さ確保のために追加 */
+            /* min-heightを指定してつぶれないようにする */
+            min-height: 0; 
+        }
+
+        .loading {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 40px;
             font-size: 1.2rem;
-            border-radius: 5px;
-            cursor: pointer;
-            transition: background 0.2s;
-        }
-
-        button:hover { background: #45a049; }
-        button:active { transform: scale(0.98); }
-
-        /* スマホ向け調整 */
-        @media (max-width: 600px) {
-            #ui-container { padding: 0 10px; top: 10px; }
-            .ui-box { font-size: 1rem; padding: 5px 15px; }
-            #game-container::after { border-width: 10px; }
+            color: #666;
         }
     </style>
 
@@ -125,498 +114,270 @@
     </script>
 </head>
 <body>
-
-    <div id="ui-container">
-        <div class="ui-box">Score: <span id="score">0</span></div>
-        <div class="ui-box"><button id="reset-btn">Reset</button></div>
+    <div class="container">
+        <header>
+            <h1>岩国市の天気予報</h1>
+            <p class="subtitle">今後24時間のグラフ表示 (Powered by Open-Meteo)</p>
+            <div id="current-time" class="timestamp"></div>
+        </header>
+        
+        <main id="main-content">
+            <div class="loading">データを読み込み中...</div>
+        </main>
     </div>
 
-    <div id="game-container">
-        <canvas id="billiardsCanvas"></canvas>
-    </div>
-
-    <div id="message">
-        <h1 id="msg-text">Game Over</h1>
-        <button id="restart-btn">Play Again</button>
-    </div>
-
-<script>
-/**
- * Vector Utility Class
- */
-class Vec2 {
-    constructor(x, y) {
-        this.x = x;
-        this.y = y;
-    }
-    add(v) { return new Vec2(this.x + v.x, this.y + v.y); }
-    sub(v) { return new Vec2(this.x - v.x, this.y - v.y); }
-    mult(s) { return new Vec2(this.x * s, this.y * s); }
-    mag() { return Math.sqrt(this.x * this.x + this.y * this.y); }
-    normalize() {
-        const m = this.mag();
-        return m === 0 ? new Vec2(0, 0) : new Vec2(this.x / m, this.y / m);
-    }
-    dot(v) { return this.x * v.x + this.y * v.y; }
-    dist(v) { return Math.sqrt((this.x - v.x)**2 + (this.y - v.y)**2); }
-    copy() { return new Vec2(this.x, this.y); }
-}
-
-/**
- * Game Configuration
- */
-const CONFIG = {
-    friction: 0.985,     // 摩擦係数（低いほど滑らない）
-    wallBounce: 0.7,     // 壁の反発係数
-    ballBounce: 0.9,     // ボール同士の反発係数
-    minSpeed: 0.05,      // 停止とみなす速度閾値
-    maxPower: 25,        // 最大ショットパワー
-    pocketRadius: 35,    // ポケットの判定半径
-    ballRadius: 13,      // ボールの半径
-    tablePadding: 30     // 木枠の内側の余白（壁の位置）
-};
-
-/**
- * Game State
- */
-const state = {
-    balls: [],
-    cueBall: null,
-    pockets: [],
-    isDragging: false,
-    dragStart: null,
-    dragCurrent: null,
-    score: 0,
-    gameOver: false,
-    width: 800,
-    height: 450
-};
-
-// Canvas Setup
-const canvas = document.getElementById('billiardsCanvas');
-const ctx = canvas.getContext('2d');
-const scoreEl = document.getElementById('score');
-const msgEl = document.getElementById('message');
-const msgTextEl = document.getElementById('msg-text');
-
-/**
- * Ball Class
- */
-class Ball {
-    constructor(x, y, color, id) {
-        this.pos = new Vec2(x, y);
-        this.vel = new Vec2(0, 0);
-        this.radius = CONFIG.ballRadius;
-        this.color = color;
-        this.id = id; // 'white' or number
-        this.inPocket = false;
-        
-        // ハイライト用のオフセット
-        this.highlightOffset = new Vec2(-this.radius * 0.3, -this.radius * 0.3);
-    }
-
-    update() {
-        if (this.inPocket) return;
-
-        // Apply velocity
-        this.pos = this.pos.add(this.vel);
-
-        // Friction
-        this.vel = this.vel.mult(CONFIG.friction);
-
-        // Stop if too slow
-        if (this.vel.mag() < CONFIG.minSpeed) {
-            this.vel = new Vec2(0, 0);
-        }
-
-        // Wall collisions
-        this.checkWallCollision();
-    }
-
-    checkWallCollision() {
-        const p = CONFIG.tablePadding;
-        const w = state.width;
-        const h = state.height;
-        const r = this.radius;
-
-        if (this.pos.x < p + r) {
-            this.pos.x = p + r;
-            this.vel.x *= -CONFIG.wallBounce;
-        } else if (this.pos.x > w - p - r) {
-            this.pos.x = w - p - r;
-            this.vel.x *= -CONFIG.wallBounce;
-        }
-
-        if (this.pos.y < p + r) {
-            this.pos.y = p + r;
-            this.vel.y *= -CONFIG.wallBounce;
-        } else if (this.pos.y > h - p - r) {
-            this.pos.y = h - p - r;
-            this.vel.y *= -CONFIG.wallBounce;
-        }
-    }
-
-    draw(ctx) {
-        if (this.inPocket) return;
-
-        // Shadow
-        ctx.beginPath();
-        ctx.arc(this.pos.x + 2, this.pos.y + 2, this.radius, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(0,0,0,0.3)';
-        ctx.fill();
-
-        // Main Ball
-        ctx.beginPath();
-        ctx.arc(this.pos.x, this.pos.y, this.radius, 0, Math.PI * 2);
-        ctx.fillStyle = this.color;
-        ctx.fill();
-
-        // Highlight (Shiny effect)
-        ctx.beginPath();
-        ctx.arc(this.pos.x + this.highlightOffset.x, this.pos.y + this.highlightOffset.y, this.radius * 0.3, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-        ctx.fill();
-
-        // Stripe or Number (Simplified visual)
-        if (this.id !== 'white' && this.id !== 'black') {
-            ctx.fillStyle = 'rgba(255,255,255,0.8)';
-            ctx.beginPath();
-            ctx.arc(this.pos.x, this.pos.y, this.radius * 0.5, 0, Math.PI * 2);
-            ctx.fill();
-            
-            ctx.fillStyle = '#000';
-            ctx.font = '10px Arial';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(this.id, this.pos.x, this.pos.y);
-        }
-    }
-}
-
-/**
- * Game Logic
- */
-function initGame() {
-    // Canvas Resizing logic
-    // アスペクト比 16:9 を維持しつつ画面に合わせる
-    const maxWidth = window.innerWidth - 40;
-    const maxHeight = window.innerHeight - 100;
-    const aspect = 16 / 9;
-
-    if (maxWidth / aspect < maxHeight) {
-        state.width = maxWidth;
-        state.height = maxWidth / aspect;
-    } else {
-        state.height = maxHeight;
-        state.width = maxHeight * aspect;
-    }
-
-    canvas.width = state.width;
-    canvas.height = state.height;
-
-    // Recalculate padding/radius based on scale? 
-    // For simplicity, we keep physics constants relative or fixed, 
-    // but here we might want to scale them if the screen is very small.
-    // 今回は固定値でいくが、画面サイズに合わせて少し調整する。
-    const scaleFactor = state.width / 800;
-    CONFIG.ballRadius = 13 * scaleFactor;
-    CONFIG.pocketRadius = 30 * scaleFactor;
-    CONFIG.tablePadding = 25 * scaleFactor;
-
-    resetBoard();
-    
-    // イベントリスナーの登録（一度だけ）
-    if (!window.listenersAdded) {
-        canvas.addEventListener('mousedown', onPointerDown);
-        canvas.addEventListener('mousemove', onPointerMove);
-        window.addEventListener('mouseup', onPointerUp);
-        
-        canvas.addEventListener('touchstart', onTouchDown, {passive: false});
-        canvas.addEventListener('touchmove', onTouchMove, {passive: false});
-        window.addEventListener('touchend', onPointerUp);
-
-        document.getElementById('reset-btn').addEventListener('click', () => {
-            msgEl.style.display = 'none';
-            resetBoard();
-        });
-        document.getElementById('restart-btn').addEventListener('click', () => {
-            msgEl.style.display = 'none';
-            resetBoard();
-        });
-        
-        window.listenersAdded = true;
-    }
-
-    loop();
-}
-
-function resetBoard() {
-    state.balls = [];
-    state.score = 0;
-    state.gameOver = false;
-    scoreEl.innerText = state.score;
-    msgEl.style.display = 'none';
-
-    const w = state.width;
-    const h = state.height;
-    
-    // Pockets positions
-    state.pockets = [
-        new Vec2(0, 0), new Vec2(w/2, 0), new Vec2(w, 0),
-        new Vec2(0, h), new Vec2(w/2, h), new Vec2(w, h)
-    ];
-
-    // Cue Ball (White)
-    state.cueBall = new Ball(w * 0.25, h * 0.5, '#fff', 'white');
-    state.balls.push(state.cueBall);
-
-    // Rack (Triangle formation)
-    // 1
-    // 2 3
-    // 4 5 6
-    // 7 8 9 10
-    // 11 12 13 14 15
-    const startX = w * 0.75;
-    const startY = h * 0.5;
-    const r = CONFIG.ballRadius;
-    const colors = [
-        '#e9e900', '#0000e9', '#e90000', '#e900e9', '#e97500', 
-        '#00e900', '#750000', '#000000', '#e9e900', '#0000e9', 
-        '#e90000', '#e900e9', '#e97500', '#00e900', '#750000'
-    ]; // Standard pool colors roughly
-
-    let k = 0;
-    for (let i = 0; i < 5; i++) {
-        for (let j = 0; j <= i; j++) {
-            const x = startX + i * (r * 2 * 0.866); // 0.866 is sin(60deg)
-            const y = startY - (i * r) + (j * r * 2);
-            // 8番ボールは黒 (colors[7])
-            const color = colors[k];
-            const id = k + 1;
-            
-            // Randomize position slightly for realism? No, perfect rack.
-            state.balls.push(new Ball(x, y, color, id));
-            k++;
-            if(k >= 15) break;
-        }
-    }
-}
-
-// Input Handling
-function getPointerPos(e) {
-    const rect = canvas.getBoundingClientRect();
-    const x = (e.clientX !== undefined ? e.clientX : e.touches[0].clientX) - rect.left;
-    const y = (e.clientY !== undefined ? e.clientY : e.touches[0].clientY) - rect.top;
-    return new Vec2(x, y);
-}
-
-function onTouchDown(e) { e.preventDefault(); onPointerDown(e); }
-function onTouchMove(e) { e.preventDefault(); onPointerMove(e); }
-
-function onPointerDown(e) {
-    // 全てのボールが停止している場合のみ操作可能
-    if (isAnyBallMoving() || state.gameOver) return;
-
-    const pos = getPointerPos(e);
-    // 白球の近くをクリックしたか？
-    if (pos.dist(state.cueBall.pos) < CONFIG.ballRadius * 3) {
-        state.isDragging = true;
-        state.dragStart = state.cueBall.pos; // 常にボール中心から引く
-        state.dragCurrent = pos;
-    }
-}
-
-function onPointerMove(e) {
-    if (!state.isDragging) return;
-    state.dragCurrent = getPointerPos(e);
-}
-
-function onPointerUp(e) {
-    if (!state.isDragging) return;
-    
-    // Shot!
-    const pullVector = state.dragStart.sub(state.dragCurrent);
-    const mag = pullVector.mag();
-    
-    if (mag > 5) { // 誤操作防止の閾値
-        let power = mag * 0.15; // パワー係数
-        if (power > CONFIG.maxPower) power = CONFIG.maxPower;
-        
-        const shotVel = pullVector.normalize().mult(power);
-        state.cueBall.vel = shotVel;
-    }
-
-    state.isDragging = false;
-    state.dragStart = null;
-    state.dragCurrent = null;
-}
-
-function isAnyBallMoving() {
-    return state.balls.some(b => b.vel.mag() > 0);
-}
-
-// Physics Engine
-function resolveCollisions() {
-    // Ball to Ball
-    for (let i = 0; i < state.balls.length; i++) {
-        for (let j = i + 1; j < state.balls.length; j++) {
-            const b1 = state.balls[i];
-            const b2 = state.balls[j];
-            
-            if (b1.inPocket || b2.inPocket) continue;
-
-            const dist = b1.pos.dist(b2.pos);
-            const minDist = b1.radius + b2.radius;
-
-            if (dist < minDist) {
-                // Collision detected
-                const normal = b2.pos.sub(b1.pos).normalize();
-                
-                // Position correction (prevent sticking)
-                const overlap = minDist - dist;
-                const correction = normal.mult(overlap / 2);
-                b1.pos = b1.pos.sub(correction);
-                b2.pos = b2.pos.add(correction);
-
-                // Velocity reflection
-                const relVel = b1.vel.sub(b2.vel);
-                const sepVel = relVel.dot(normal);
-                const newSepVel = -sepVel * CONFIG.ballBounce;
-                const sepVelVec = normal.mult(newSepVel - sepVel);
-                
-                // Assuming equal mass
-                const impulse = sepVelVec.mult(0.5);
-                b1.vel = b1.vel.add(impulse);
-                b2.vel = b2.vel.sub(impulse);
+    <script>
+        window.onerror = function(message, source, lineno, colno, error) {
+            const container = document.getElementById('main-content');
+            if (container) {
+                container.innerHTML = `
+                    <div style="color: #d32f2f; background: #ffebee; padding: 20px; border-radius: 8px;">
+                        <strong>エラーが発生しました:</strong><br>${message}
+                    </div>`;
             }
-        }
-    }
+        };
 
-    // Ball to Pocket
-    state.balls.forEach(b => {
-        if (b.inPocket) return;
-        for (let p of state.pockets) {
-            // ポケット判定は少し甘めに（中心がポケット半径内に入ればOK）
-            if (b.pos.dist(p) < CONFIG.pocketRadius) {
-                b.inPocket = true;
-                b.vel = new Vec2(0, 0); // Stop it
+        document.addEventListener('DOMContentLoaded', () => {
+            const LAT = 34.16;
+            const LON = 132.22;
+            const apiURL = `https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}&hourly=temperature_2m,precipitation_probability,precipitation&timezone=Asia%2FTokyo`;
+
+            const mainContent = document.getElementById('main-content');
+            const timeDisplay = document.getElementById('current-time');
+
+            // 現在時刻表示
+            const now = new Date();
+            if (timeDisplay) {
+                timeDisplay.textContent = `取得日時: ${now.toLocaleString('ja-JP')}`;
+            }
+
+            console.log("Fetching URL:", apiURL);
+
+            fetch(apiURL)
+                .then(response => {
+                    if (!response.ok) throw new Error(`HTTPエラー status: ${response.status}`);
+                    return response.json();
+                })
+                .then(data => {
+                    console.log("Data received:", data);
+                    renderGraphs(data);
+                })
+                .catch(error => {
+                    console.error("Render Error:", error);
+                    mainContent.innerHTML = `
+                        <div class="loading" style="color: #d32f2f;">
+                            データの取得に失敗しました。<br><small>${error.message}</small>
+                        </div>`;
+                });
+
+            function renderGraphs(data) {
+                mainContent.innerHTML = `
+                    <div class="charts-container">
+                        <div class="chart-wrapper">
+                            <div class="chart-title">🌡️ 気温 (℃)</div>
+                            <div class="canvas-container">
+                                <canvas id="tempChart"></canvas>
+                            </div>
+                        </div>
+                        <div class="chart-wrapper">
+                            <div class="chart-title">☔ 降水確率 (%)</div>
+                            <div class="canvas-container">
+                                <canvas id="rainChart"></canvas>
+                            </div>
+                        </div>
+                        <div class="chart-wrapper">
+                            <div class="chart-title">💧 降水量 (mm)</div>
+                            <div class="canvas-container">
+                                <canvas id="precipChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                const hourly = data.hourly;
                 
-                if (b.id === 'white') {
-                    // Scratch!
-                    handleScratch();
-                } else {
-                    state.score += 100;
-                    scoreEl.innerText = state.score;
-                    checkWin();
+                // 現在時刻 (JST) 以降のデータを検索
+                const nowJST = new Date(Date.now() + 9 * 60 * 60 * 1000);
+                const currentIsoJST = nowJST.toISOString().slice(0, 16);
+                
+                let startIndex = 0;
+                if (hourly && hourly.time) {
+                    startIndex = hourly.time.findIndex(t => t >= currentIsoJST);
+                    if (startIndex === -1) startIndex = 0;
                 }
+
+                // 24時間分に制限
+                const count = 24;
+                const totalLength = hourly && hourly.time ? hourly.time.length : 0;
+                const endIndex = Math.min(startIndex + count, totalLength);
+
+                // ラベルとデータの配列を作成
+                const labels = [];
+                const temps = [];
+                const probs = [];
+                const precips = [];
+
+                if (totalLength > 0) {
+                    for (let i = startIndex; i < endIndex; i++) {
+                        const timeStr = hourly.time[i];
+                        const dateObj = new Date(timeStr);
+                        const hour = dateObj.getHours();
+                        const day = dateObj.getDate();
+                        
+                        let label = `${hour}:00`;
+                        if (hour === 0 || i === startIndex) {
+                            label = `${day}日 ${hour}:00`;
+                        }
+                        labels.push(label);
+
+                        // 気温
+                        temps.push(hourly.temperature_2m ? hourly.temperature_2m[i] : null);
+
+                        // 降水確率
+                        let prob = hourly.precipitation_probability ? (hourly.precipitation_probability[i] || 0) : 0;
+                        // 0の場合でもグラフに見えるように微小値を入れる
+                        if (prob === 0) prob = 0.5;
+                        probs.push(prob);
+
+                        // 降水量
+                        let precip = hourly.precipitation ? (hourly.precipitation[i] || 0) : 0;
+                        // 0の場合でもグラフに見えるように微小値を入れる
+                        if (precip === 0) precip = 0.1;
+                        precips.push(precip);
+                    }
+                }
+
+                console.log("Processed Data:", { labels, temps, probs, precips });
+
+                // --- 共通オプション ---
+                const commonOptions = {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } }
+                };
+                
+                // ゼロライン強調用のグリッド設定
+                const zeroLineGrid = {
+                    color: (context) => context.tick.value === 0 ? '#888' : '#ddd',
+                    lineWidth: (context) => context.tick.value === 0 ? 2 : 1,
+                };
+
+                // --- 気温グラフ描画 ---
+                try {
+                    const tempCanvas = document.getElementById('tempChart');
+                    if (tempCanvas && temps.length > 0) {
+                        new Chart(tempCanvas, {
+                            type: 'line',
+                            data: {
+                                labels: labels,
+                                datasets: [{
+                                    label: '気温',
+                                    data: temps,
+                                    borderColor: '#ffb703',
+                                    backgroundColor: 'rgba(255, 183, 3, 0.2)',
+                                    borderWidth: 2,
+                                    tension: 0.3, 
+                                    fill: true,
+                                    pointRadius: 3
+                                }]
+                            },
+                            options: {
+                                ...commonOptions,
+                                scales: {
+                                    y: { 
+                                        beginAtZero: false, 
+                                        title: { display: true, text: '℃' },
+                                        suggestedMin: Math.min(...temps) - 2, 
+                                        suggestedMax: Math.max(...temps) + 2
+                                    }
+                                }
+                            }
+                        });
+                    }
+                } catch (e) { console.error(e); }
+
+                // --- 降水確率グラフ描画 ---
+                try {
+                    const rainCanvas = document.getElementById('rainChart');
+                    if (rainCanvas && probs.length > 0) {
+                        new Chart(rainCanvas, {
+                            type: 'bar',
+                            data: {
+                                labels: labels,
+                                datasets: [{
+                                    label: '降水確率',
+                                    data: probs,
+                                    backgroundColor: '#0077b6',
+                                    borderColor: '#005f87',
+                                    borderWidth: 1,
+                                    borderRadius: 4,
+                                    barPercentage: 0.8,
+                                    minBarLength: 5, // 最小の高さを確保
+                                }]
+                            },
+                            options: {
+                                ...commonOptions,
+                                scales: {
+                                    y: { 
+                                        min: -5,
+                                        max: 100,
+                                        title: { display: true, text: '%' },
+                                        grid: zeroLineGrid,
+                                        ticks: { 
+                                            stepSize: 20,
+                                            // マイナスの値は表示しない
+                                            callback: function(value) {
+                                                return value < 0 ? '' : value;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        });
+                    }
+                } catch (e) { console.error(e); }
+
+                // --- 降水量グラフ描画 (新規) ---
+                try {
+                    const precipCanvas = document.getElementById('precipChart');
+                    if (precipCanvas && precips.length > 0) {
+                        new Chart(precipCanvas, {
+                            type: 'bar',
+                            data: {
+                                labels: labels,
+                                datasets: [{
+                                    label: '降水量',
+                                    data: precips,
+                                    backgroundColor: '#4cc9f0',
+                                    borderColor: '#4361ee',
+                                    borderWidth: 1,
+                                    borderRadius: 4,
+                                    barPercentage: 0.8,
+                                    minBarLength: 5, // 最小の高さを確保
+                                }]
+                            },
+                            options: {
+                                ...commonOptions,
+                                scales: {
+                                    y: { 
+                                        min: -0.5, 
+                                        title: { display: true, text: 'mm' },
+                                        suggestedMax: 5,
+                                        grid: zeroLineGrid,
+                                        ticks: {
+                                            // マイナスの値は表示しない
+                                            callback: function(value) {
+                                                return value < 0 ? '' : value;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        });
+                    }
+                } catch (e) { console.error(e); }
             }
-        }
-    });
-}
-
-function handleScratch() {
-    // 白球が落ちた場合、少し待ってから元の位置（あるいはフリーボール）に戻す
-    // ここでは簡易的に初期位置に戻す。もしそこに他のボールがあればずらす。
-    setTimeout(() => {
-        state.cueBall.inPocket = false;
-        state.cueBall.vel = new Vec2(0, 0);
-        state.cueBall.pos = new Vec2(state.width * 0.25, state.height * 0.5);
-        state.score -= 50; // Penalty
-        if (state.score < 0) state.score = 0;
-        scoreEl.innerText = state.score;
-    }, 500);
-}
-
-function checkWin() {
-    // 白球以外の全てのボールが落ちたらクリア
-    const remaining = state.balls.filter(b => !b.inPocket && b.id !== 'white');
-    if (remaining.length === 0) {
-        state.gameOver = true;
-        msgTextEl.innerText = "YOU WIN!";
-        msgEl.style.display = 'block';
-    }
-}
-
-// Drawing
-function drawTable() {
-    // Felt
-    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--table-color').trim();
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    // Pockets
-    ctx.fillStyle = '#111';
-    for (let p of state.pockets) {
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, CONFIG.pocketRadius, 0, Math.PI * 2);
-        ctx.fill();
-    }
-    
-    // Head String (Line)
-    ctx.beginPath();
-    ctx.moveTo(state.width * 0.25, 0);
-    ctx.lineTo(state.width * 0.25, state.height);
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-}
-
-function drawCue() {
-    if (!state.isDragging || !state.cueBall) return;
-
-    const start = state.cueBall.pos;
-    const current = state.dragCurrent;
-    const dir = start.sub(current); // 引っ張った逆方向
-    
-    // パワー制限の視覚化
-    const mag = dir.mag();
-    let drawMag = mag;
-    if (drawMag * 0.15 > CONFIG.maxPower) {
-        drawMag = CONFIG.maxPower / 0.15;
-    }
-    
-    const end = start.add(dir.normalize().mult(drawMag));
-
-    // ガイドライン（予測線）
-    ctx.beginPath();
-    ctx.moveTo(start.x, start.y);
-    ctx.lineTo(end.x, end.y);
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
-    ctx.lineWidth = 4;
-    ctx.setLineDash([10, 5]);
-    ctx.stroke();
-    ctx.setLineDash([]);
-
-    // キュー本体（簡易表示）
-    // 引っ張っている指の位置からボールへ向かう線
-    ctx.beginPath();
-    ctx.moveTo(current.x, current.y);
-    ctx.lineTo(start.x, start.y);
-    ctx.strokeStyle = '#8d6e63'; // Wood color
-    ctx.lineWidth = 8;
-    ctx.stroke();
-}
-
-function loop() {
-    // Logic
-    state.balls.forEach(b => b.update());
-    resolveCollisions();
-
-    // Render
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
-    drawTable();
-    
-    state.balls.forEach(b => b.draw(ctx));
-    
-    drawCue();
-
-    requestAnimationFrame(loop);
-}
-
-// Start
-window.onload = initGame;
-window.onresize = initGame;
-
-</script>
+        });
+    </script>
 </body>
 </html>
